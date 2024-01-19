@@ -277,6 +277,7 @@ def swallow_io(input_stream=None, binary=False):
 def create_tempdir():
     with tempfile.TemporaryDirectory() as dirname:
         with chdir(dirname):
+            logger.debug(dirname) # gave an error of the dir not existing then didn't when I printed it. Classic.
             yield dirname
 
 

@@ -28,12 +28,14 @@ class AiHandler:
         self.limiter = AsyncLimiter(get_settings().config.max_requests_per_minute)
         try:
             model = get_settings().get("config.model")
-            _ = requests.post(
+            resp = requests.post(
                     url=endpoint + "/generate",
                     json = {
                         "model": model
                     }
             )
+            resp.raise_for_status()
+            logger.debug("Model loaded")
         except AttributeError as e:
             raise ValueError("Ollama model is not available") from e
 
@@ -64,20 +66,22 @@ class AiHandler:
                 logger.info("Running inference ...")
                 logger.debug(f"system:\n{system}")
                 logger.debug(f"user:\n{user}")
-                response = requests.post(
+                response_obj = requests.post(
                     url=endpoint + "/generate",
                     json = {
                         "model": model,
                         "prompt": user,
                         "system": system,
+                        "stream": False,
                         "options": {
                             "num_predict": 2000,
-                            "stop": "<|EOT|>",
+                            "stop": ["<|EOT|>"],
                             "repeat_penalty": frequency_penalty+1,
                             "temperature": temperature
                             }
                         }
                     )
+                response = response_obj.json()
                 response["response"] = response["response"].rstrip()
                 if response["response"].endswith("<|EOT|>"):
                     response["response"] = response["response"][:-7]
@@ -88,7 +92,7 @@ class AiHandler:
             raise APIError
         resp = response["response"]
         finish_reason = 'stop'
-        if response["eval_count"] + response["prompt_eval_count"] == 2000: # cut short (unless the token length lienes up perfectly somehow)
+        if response["eval_count"] == 2000: # cut short (unless the token length lienes up perfectly somehow)
             finish_reason = None
         logger.debug(f"response:\n{resp}")
         logger.info('done')

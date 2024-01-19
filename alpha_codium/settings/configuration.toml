@@ -1,11 +1,11 @@
 [config]
 ollama_endpoint="http://localhost:11434/api"
-model="deepseek-coder:6.7b"
-#model = "openhermes2.5-mistral:7b-q4_K_M"
+model="openhermes2.5-mistral:7b-q4_K_M"
+# ollama run [model name] => model="[model name]"
 ai_timeout=90 # seconds
 fallback_models =[]
 verbosity_level=0 # 0,1,2
-private_dataset_cache_dir="~/.cache/huggingface/datasets/alpha_codium"
+private_dataset_cache_dir="./datasets"
 max_requests_per_minute=600
 
 
