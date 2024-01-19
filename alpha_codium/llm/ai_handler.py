@@ -92,7 +92,12 @@ class AiHandler:
             raise APIError
         resp = response["response"]
         finish_reason = 'stop'
-        if response["eval_count"] == 2000: # cut short (unless the token length lienes up perfectly somehow)
+        available_resp_size = 2000
+        if response["prompt_eval_count"]: # this gave an error sometimes
+            available_resp_size -= response["prompt_eval_count"]
+        else:
+            available_resp_size -= 100 # inaccurate
+        if response["eval_count"] == available_resp_size: # cut short (unless the token length lienes up perfectly somehow)
             finish_reason = None
         logger.debug(f"response:\n{resp}")
         logger.info('done')
