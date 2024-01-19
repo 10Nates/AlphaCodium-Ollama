@@ -6,7 +6,16 @@
 Official Implementation
 > Tal Ridnik, Dedy Kredo, Itamar Friedman <br/> CodiumAI
 
-**Abstract**
+## Table of Contents
+- [Abstract](#abstract)
+- [Installation](#installation)
+- [How to run](#how-to-run)
+- [Technical Q&A](#technical-qa)
+- [Broader Applicability](#broader-applicability)
+- [Acknowledgments](#acknowledgments)
+- [Citation](#citation)
+
+## Abstract
 
 Code generation problems differ from common natural language problems - they require matching the exact syntax of the target language, identifying happy paths and edge cases, paying attention to numerous small details in the problem spec, and addressing other code-specific issues and requirements. Hence, many of the optimizations and tricks that have been successful in natural language generation may not be effective for code tasks.
 
@@ -59,7 +68,7 @@ python -m alpha_codium.solve_problem \
 --problem_number 0
 ```
 - The `dataset_name` is the path to the dataset folder you downloaded in the installation step.
-- Note that the validation set contain 117 problems, and the test set contain 165 problems, so the `problem_number` parameter should be accordingly (zero-based)
+- Note that the validation set contains 117 problems, and the test set contains 165 problems, so the `problem_number` parameter should be accordingly (zero-based)
 - The `split_name` can be either `valid` or `test`.
 - The followings sections in the configuration file: 
 `solve`, `self_reflection`,`possible_solutions`,`generate_ai_tests`,`initial_code_generation`,`public_tests`, `ai_tests`  
@@ -99,6 +108,34 @@ python -m alpha_codium.evaluate_dataset\
 --split_name test\
 --database_solution_path /path/to/output/dir/dataset_output.json
 ```
+
+## Technical Q&A
+Aggregating some technical questions we received about this project:
+___
+**Q: How much time did you spend on "prompt engineering" compared to "flow engineering"?**<br><br>
+**A:** Structured output almost completely eliminates the need for simple prompt engineering.
+We estimate that ~95% of the time we did more high-level design, reasoning, injecting data at the correct places, ..., a.k.a. "flow engineering".
+___
+
+**Q: How do you know that there wasn't a data leakage ?** <br><br>
+**A:** The test set of CodeContests dataset comprises from problems published after September 2021, while the GPT-4 model variant we used (gpt-4-0613) has a data cutoff of September 2021. Hence, there is no data leakage for GPT4, on the test set.
+For other models like DeepSeek, we cannot be sure. However, note that our [main result](./pics/comparison.png) is a comparison of "direct prompt" vs. "AlphaCodium flow". Data leakage would help both approaches, so the relative improvement of AlphaCodium flow is still valid.
+___
+
+**Q: Is this project relevant only to specific programming languages?**<br><br>
+**A:** No. The proposed flow is language agnostic. We generated solutions in Python, but the flow can be applied to any language.
+___
+
+**Q: How did you manage the context window?** <br><br>
+**A:** We used models with a context window of 8192 tokens, and we did not encounter cases where it did not suffice.
+However, we clearly observed that as the context we used in practice grow larger (let's say, above 4000 tokens), the model starts to "ignore" some of the information in the context. Hence, there is a clear tradeoff:
+- Injecting the results of previous stages into the context, may help the model to generate better code.
+- However, it may also cause the model to ignore specific details and nuances from the problem description.
+___
+
+**Q: Is this work "realistic" in terms of the number of LLM calls?** <br><br>
+**A:** In comparison to AlphaCode, we do four orders of magnitude (!) fewer [calls](./pics/computational_effort.png) (per solution AlphaCodium does 15-20 calls).
+Yet we acknowledge that for some applications, this may still be too much, and more optimizations are needed. We however believe that many of the ideas and principles we acquired in this work are broadly applicable, even when the number of calls is further limited.
 
 ## Broader Applicability
 While this work presents results on CodeContests dataset, we believe that it has a broader applicability.
