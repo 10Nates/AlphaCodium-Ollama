@@ -1,20 +1,16 @@
 import logging
 import os
+import requests
 
-import litellm
-import openai
 from aiolimiter import AsyncLimiter
-from litellm import acompletion
-from litellm import RateLimitError
-from litellm.exceptions import APIError
 # from openai.error import APIError, RateLimitError, Timeout, TryAgain
-from retry import retry
-
+from litellm.exceptions import APIError # compatibility with other parts of the code
 from alpha_codium.settings.config_loader import get_settings
 from alpha_codium.log import get_logger
 
 logger = get_logger(__name__)
-OPENAI_RETRIES = 5
+
+endpoint = get_settings().config.ollama_endpoint
 
 
 class AiHandler:
@@ -26,46 +22,28 @@ class AiHandler:
 
     def __init__(self):
         """
-        Initializes the OpenAI API key and other settings from a configuration file.
-        Raises a ValueError if the OpenAI key is missing.
+        Loads model into memory.
+        Raises a ValueError if it is unavailable.
         """
         self.limiter = AsyncLimiter(get_settings().config.max_requests_per_minute)
         try:
-            openai.api_key = get_settings().openai.key
-            litellm.openai_key = get_settings().openai.key
-            self.azure = False
-            if "deepseek" in get_settings().get("config.model"):
-                litellm.register_prompt_template(
-                    model="huggingface/deepseek-ai/deepseek-coder-33b-instruct",
-                    roles={
-                        "system": {
-                            "pre_message": "",
-                            "post_message": "\n"
-                        },
-                        "user": {
-                            "pre_message": "### Instruction:\n",
-                            "post_message": "\n### Response:\n"
-                        },
-                    },
-
-                )
+            model = get_settings().get("config.model")
+            _ = requests.post(
+                    url=endpoint + "/generate",
+                    json = {
+                        "model": model
+                    }
+            )
         except AttributeError as e:
-            raise ValueError("OpenAI key is required") from e
+            raise ValueError("Ollama model is not available") from e
 
     @property
     def deployment_id(self):
         """
-        Returns the deployment ID for the OpenAI API.
+        Returns the deployment ID. Doesn't really apply for Ollama.
         """
-        return get_settings().get("OPENAI.DEPLOYMENT_ID", None)
+        return None
 
-    @retry(
-        exceptions=(AttributeError, RateLimitError),
-        tries=OPENAI_RETRIES,
-        delay=2,
-        backoff=2,
-        jitter=(1, 3),
-    )
     async def chat_completion(
             self, model: str,
             system: str,
@@ -86,48 +64,32 @@ class AiHandler:
                 logger.info("Running inference ...")
                 logger.debug(f"system:\n{system}")
                 logger.debug(f"user:\n{user}")
-                if "deepseek" in get_settings().get("config.model"):
-                    response = await acompletion(
-                        model="huggingface/deepseek-ai/deepseek-coder-33b-instruct",
-                        messages=[
-                            {"role": "system", "content": system},
-                            {"role": "user", "content": user},
-                        ],
-                        api_base=get_settings().get("config.model"),
-                        temperature=temperature,
-                        repetition_penalty=frequency_penalty+1, # the scale of TGI is different from OpenAI
-                        force_timeout=get_settings().config.ai_timeout,
-                        max_tokens=2000,
-                        stop=['<|EOT|>'],
+                response = requests.post(
+                    url=endpoint + "/generate",
+                    json = {
+                        "model": model,
+                        "prompt": user,
+                        "system": system,
+                        "options": {
+                            "num_predict": 2000,
+                            "stop": "<|EOT|>",
+                            "repeat_penalty": frequency_penalty+1,
+                            "temperature": temperature
+                            }
+                        }
                     )
-                    response["choices"][0]["message"]["content"] = response["choices"][0]["message"]["content"].rstrip()
-                    if response["choices"][0]["message"]["content"].endswith("<|EOT|>"):
-                        response["choices"][0]["message"]["content"] = response["choices"][0]["message"]["content"][:-7]
-                else:
-                    response = await acompletion(
-                        model=model,
-                        deployment_id=deployment_id,
-                        messages=[
-                            {"role": "system", "content": system},
-                            {"role": "user", "content": user},
-                        ],
-                        temperature=temperature,
-                        frequency_penalty=frequency_penalty,
-                        force_timeout=get_settings().config.ai_timeout,
-                    )
-        except (APIError) as e:
-            logging.error("Error during OpenAI inference")
-            raise
-        except RateLimitError as e:
-            logging.error("Rate limit error during OpenAI inference")
-            raise
+                response["response"] = response["response"].rstrip()
+                if response["response"].endswith("<|EOT|>"):
+                    response["response"] = response["response"][:-7]
         except Exception as e:
-            logging.error("Unknown error during OpenAI inference: ", e)
+            logging.error("Error during Ollama inference: ", e)
             raise APIError from e
-        if response is None or len(response["choices"]) == 0:
+        if response is None:
             raise APIError
-        resp = response["choices"][0]["message"]["content"]
-        finish_reason = response["choices"][0]["finish_reason"]
+        resp = response["response"]
+        finish_reason = 'stop'
+        if response["eval_count"] + response["prompt_eval_count"] == 2000: # cut short (unless the token length lienes up perfectly somehow)
+            finish_reason = None
         logger.debug(f"response:\n{resp}")
         logger.info('done')
         logger.info("-----------------")
