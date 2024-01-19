@@ -33,19 +33,22 @@ Many of the principles and best practices we acquired in this work, we believe, 
 
 (1) setup a virtual environment and run: `pip install -r requirements.txt`
 
-(2) Duplicate the file `alpha_codium/settings/.secrets_template.toml`, rename it as `.secrets.toml`, and fill your openai api key:
+(2) Install [Ollama](https://ollama.ai/)
+
+(2) Open `alpha_codium/settings/configuration.toml` and change the endpoint and model to your Ollama instance:
 ```
-[openai]
-key = "..."
+ollama_endpoint="http://localhost:11434/api"
+model="openhermes2.5-mistral:7b-q4_K_M"
+# ollama run [model name] => model="[model name]"
 ```
 
-(3) Download the processed CodeContest validation and test dataset from [hugging face](https://huggingface.co/datasets/talrid/CodeContests_valid_and_test_AlphaCodium/blob/main/codecontests_valid_and_test_processed_alpha_codium.zip), extract the zip file, and placed the extracted folder in the root of the project.
+(3) Download the processed CodeContest validation and test dataset from [hugging face](https://huggingface.co/datasets/talrid/CodeContests_valid_and_test_AlphaCodium/blob/main/codecontests_valid_and_test_processed_alpha_codium.zip), extract the zip file, and placed the extracted folder in a different folder labeled `datasets` of the project, i.e. `datasets/valid_and_test_processed`.
 
 ## How to run
 
 ### Configuration
 The file: `alpha_codium/settings/configuration.toml` contains the configuration for the project.
-In the `config` section you can choose the model you want to use ("gpt-4", "gpt-3.5-turbo-16k", or others).
+In the `config` section you can choose the model you want to use ("llama2", "mistral", or others).
 
 ### Solving a specific problem
 To solve a specific problem with AlphaCodium, from the root folder run:
